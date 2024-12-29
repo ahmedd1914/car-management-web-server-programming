@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import cars, garages, maintenance
@@ -22,7 +24,8 @@ app.add_middleware(
 app.include_router(cars.router)
 app.include_router(garages.router)
 app.include_router(maintenance.router)
-
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 @app.get("/")
 def root():
     return {"message": "Welcome to the Car Management API!"}
