@@ -10,6 +10,13 @@ class DailyAvailabilityResponse(BaseModel):
         orm_mode = True
 
 
+
+class YearMonth(BaseModel):
+    year: int
+    month: str
+    leapYear: bool
+    monthValue: int
+
 class MonthlyReportResponse(BaseModel):
     year: int
     month: int
