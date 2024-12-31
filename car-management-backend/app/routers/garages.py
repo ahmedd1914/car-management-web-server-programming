@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -6,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.cruds import garage as garage_crud
-from app.cruds.reports import get_daily_availability_report
+from app.cruds.reports import get_daily_availability_report, get_monthly_requests_report
+
 from app.models.database import SessionLocal
 from app.schemas.garage import (
     GarageCreate,
@@ -14,7 +14,6 @@ from app.schemas.garage import (
     GarageUpdate,
 
 )
-from app.schemas.reports import DailyAvailabilityResponse
 
 router = APIRouter()
 
@@ -40,8 +39,7 @@ def create_garage_endpoint(garage: GarageCreate, db: Session = Depends(get_db)):
 def list_garages_endpoint(city: Optional[str] = None, db: Session = Depends(get_db)):
     return garage_crud.get_garages(db=db, city=city)
 
-
-@router.get("/{id}", response_model=GarageResponse)
+@router.get("/{id:int}", response_model=GarageResponse)
 def get_garage_endpoint(id: int, db: Session = Depends(get_db)):
     garage = garage_crud.get_garage(db=db, garage_id=id)
     if not garage:
@@ -56,8 +54,8 @@ def update_garage_endpoint(id: int, garage: GarageUpdate, db: Session = Depends(
         raise HTTPException(status_code=404, detail="Garage not found")
     return updated_garage
 
-logging.basicConfig(level=logging.INFO)
-@router.get("/garages/dailyAvailabilityReport")
+
+@router.get("/dailyAvailabilityReport")
 def daily_availability_report(
     garage_id: str = Query(..., alias="garageId"),  # Expect `garageId` as a string from frontend
     start_date: str = Query(..., alias="startDate"),  # Expect `startDate` as a string
@@ -68,15 +66,10 @@ def daily_availability_report(
     Generate a daily availability report for a garage.
     """
 
-    # Log raw parameters
-    logging.info(f"Received query params: garageId={garage_id}, startDate={start_date}, endDate={end_date}")
-
     # Step 1: Convert `garageId` to integer
     try:
         garage_id = int(garage_id)
-        logging.info(f"Parsed garageId: {garage_id}")
     except ValueError as e:
-        logging.error(f"Invalid garageId. Must be an integer. Error: {e}")
         raise HTTPException(
             status_code=400,
             detail="Invalid garageId. It must be an integer."
@@ -86,9 +79,7 @@ def daily_availability_report(
     try:
         start_date_parsed = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date_parsed = datetime.strptime(end_date, "%Y-%m-%d").date()
-        logging.info(f"Parsed dates: startDate={start_date_parsed}, endDate={end_date_parsed}")
     except ValueError as e:
-        logging.error(f"Invalid date format. Expected YYYY-MM-DD. Error: {e}")
         raise HTTPException(
             status_code=400,
             detail=f"Invalid date format. Expected YYYY-MM-DD. Error: {e}"
@@ -96,7 +87,6 @@ def daily_availability_report(
 
     # Step 3: Validate that start_date <= end_date
     if start_date_parsed > end_date_parsed:
-        logging.error(f"Start date {start_date_parsed} is after end date {end_date_parsed}")
         raise HTTPException(
             status_code=400,
             detail="Start date cannot be after end date."
@@ -104,11 +94,9 @@ def daily_availability_report(
 
     # Step 4: Generate the report
     try:
-        logging.info(f"Generating report for garageId={garage_id}, startDate={start_date_parsed}, endDate={end_date_parsed}")
         report = get_daily_availability_report(db, garage_id, start_date_parsed, end_date_parsed)
-        logging.info(f"Generated report: {report}")
+
     except Exception as e:
-        logging.error(f"Error generating report. Error: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Error generating report. Please try again later. Error: {e}"

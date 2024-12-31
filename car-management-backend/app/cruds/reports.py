@@ -1,5 +1,3 @@
-from typing import List
-
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
@@ -7,7 +5,7 @@ from datetime import datetime, timedelta
 
 from app.models.garage import Garage
 from app.models.maintenance import MaintenanceRequest
-from app.schemas.reports import DailyAvailabilityResponse
+
 
 
 def get_monthly_requests_report(
@@ -88,16 +86,20 @@ def get_daily_availability_report(db: Session, garage_id: int, start_date: datet
     for request in daily_requests:
         report[request.scheduled_date] = request.requests
 
-    # Generate the report including days with no requests
+    # Generate the report directly as a list of dictionaries
     final_report = []
     current_date = start_date
     while current_date <= end_date:
-        final_report.append(DailyAvailabilityResponse(
-            garage_id=garage_id,
-            date=current_date.isoformat(),
-            requests=report.get(current_date, 0),
-            available_capacity=max(0, total_capacity - report.get(current_date, 0))  # Calculate remaining capacity
-        ))
+        requests = report.get(current_date, 0)
+        available_capacity = max(0, total_capacity - requests)  # Calculate available capacity
+
+        # Add dictionary to the final report
+        final_report.append({
+            "date": current_date.isoformat(),
+            "requests": requests,
+            "availableCapacity": available_capacity  # Use camelCase directly
+        })
         current_date += timedelta(days=1)
 
     return final_report
+
