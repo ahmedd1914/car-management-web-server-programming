@@ -1,4 +1,6 @@
 from typing import List
+
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from datetime import datetime, timedelta
@@ -51,44 +53,51 @@ def get_monthly_requests_report(
     return formatted_report
 
 
-def get_daily_availability_report(
-    db: Session, garage_id: int, start_date: str, end_date: str
-) -> List[DailyAvailabilityResponse]:
-    # Parse the start_date and end_date
-    try:
-        start_date_parsed = datetime.strptime(start_date, "%Y-%m-%d").date()
-        end_date_parsed = datetime.strptime(end_date, "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
-    if start_date_parsed > end_date_parsed:
-        raise HTTPException(status_code=400, detail="Start date cannot be after end date.")
-
-    # Query the database for daily availability
-    query_result = (
-        db.query(
-            MaintenanceRequest.garage_id,
-            MaintenanceRequest.scheduled_date.label("date"),
-            db.func.count(MaintenanceRequest.id).label("requests"),
-            (Garage.capacity - db.func.count(MaintenanceRequest.id)).label("available_capacity"),
+def get_daily_availability_report(db: Session, garage_id: int, start_date: datetime.date, end_date: datetime.date):
+    """
+    Generate the daily availability report for the given date range.
+    """
+    # Fetch the garage's total capacity
+    garage = db.query(Garage).filter(Garage.id == garage_id).first()
+    if not garage:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Garage with id {garage_id} not found."
         )
-        .join(Garage, MaintenanceRequest.garage_id == Garage.id)
+    total_capacity = garage.capacity  # Use the `capacity` field from the Garage model
+
+    # Query maintenance requests grouped by date
+    daily_requests = (
+        db.query(
+            MaintenanceRequest.scheduled_date,
+            func.count(MaintenanceRequest.id).label("requests")
+        )
         .filter(
             MaintenanceRequest.garage_id == garage_id,
-            MaintenanceRequest.scheduled_date >= start_date_parsed,
-            MaintenanceRequest.scheduled_date <= end_date_parsed,
+            MaintenanceRequest.scheduled_date >= start_date,
+            MaintenanceRequest.scheduled_date <= end_date,
         )
-        .group_by(MaintenanceRequest.garage_id, MaintenanceRequest.scheduled_date, Garage.capacity)
+        .group_by(MaintenanceRequest.scheduled_date)
+        .order_by(MaintenanceRequest.scheduled_date)
         .all()
     )
 
-    # Convert query result into Pydantic models
-    return [
-        DailyAvailabilityResponse(
-            garage_id=row.garage_id,
-            date=row.date.strftime("%Y-%m-%d"),  # Convert date to string format
-            requests=row.requests,
-            available_capacity=row.available_capacity,
-        )
-        for row in query_result
-    ]
+    # Create a dictionary of requests per day
+    report = {}
+    for request in daily_requests:
+        report[request.scheduled_date] = request.requests
+
+    # Generate the report including days with no requests
+    final_report = []
+    current_date = start_date
+    while current_date <= end_date:
+        final_report.append(DailyAvailabilityResponse(
+            garage_id=garage_id,
+            date=current_date.isoformat(),
+            requests=report.get(current_date, 0),
+            available_capacity=max(0, total_capacity - report.get(current_date, 0))  # Calculate remaining capacity
+        ))
+        current_date += timedelta(days=1)
+
+    return final_report

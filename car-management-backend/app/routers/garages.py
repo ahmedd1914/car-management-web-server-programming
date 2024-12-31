@@ -1,6 +1,7 @@
+import logging
 from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from sqlalchemy.orm import Session
 
@@ -55,39 +56,67 @@ def update_garage_endpoint(id: int, garage: GarageUpdate, db: Session = Depends(
         raise HTTPException(status_code=404, detail="Garage not found")
     return updated_garage
 
-
-@router.get("/dailyAvailabilityReport", response_model=List[DailyAvailabilityResponse])
+logging.basicConfig(level=logging.INFO)
+@router.get("/garages/dailyAvailabilityReport")
 def daily_availability_report(
-    garage_id: int,
-    start_date: str,
-    end_date: str,
+    garage_id: str = Query(..., alias="garageId"),  # Expect `garageId` as a string from frontend
+    start_date: str = Query(..., alias="startDate"),  # Expect `startDate` as a string
+    end_date: str = Query(..., alias="endDate"),  # Expect `endDate` as a string
     db: Session = Depends(get_db),
 ):
-    if not garage_id or not start_date or not end_date:
-        raise HTTPException(status_code=400, detail="All parameters are required.")
+    """
+    Generate a daily availability report for a garage.
+    """
 
-    # Parse dates and validate format
+    # Log raw parameters
+    logging.info(f"Received query params: garageId={garage_id}, startDate={start_date}, endDate={end_date}")
+
+    # Step 1: Convert `garageId` to integer
+    try:
+        garage_id = int(garage_id)
+        logging.info(f"Parsed garageId: {garage_id}")
+    except ValueError as e:
+        logging.error(f"Invalid garageId. Must be an integer. Error: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid garageId. It must be an integer."
+        )
+
+    # Step 2: Parse `startDate` and `endDate`
     try:
         start_date_parsed = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date_parsed = datetime.strptime(end_date, "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+        logging.info(f"Parsed dates: startDate={start_date_parsed}, endDate={end_date_parsed}")
+    except ValueError as e:
+        logging.error(f"Invalid date format. Expected YYYY-MM-DD. Error: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid date format. Expected YYYY-MM-DD. Error: {e}"
+        )
 
-    # Validate date range
+    # Step 3: Validate that start_date <= end_date
     if start_date_parsed > end_date_parsed:
-        raise HTTPException(status_code=400, detail="Start date cannot be after end date.")
+        logging.error(f"Start date {start_date_parsed} is after end date {end_date_parsed}")
+        raise HTTPException(
+            status_code=400,
+            detail="Start date cannot be after end date."
+        )
 
-    # Fetch data from the database
-    data = get_daily_availability_report(db, garage_id, start_date, end_date)
+    # Step 4: Generate the report
+    try:
+        logging.info(f"Generating report for garageId={garage_id}, startDate={start_date_parsed}, endDate={end_date_parsed}")
+        report = get_daily_availability_report(db, garage_id, start_date_parsed, end_date_parsed)
+        logging.info(f"Generated report: {report}")
+    except Exception as e:
+        logging.error(f"Error generating report. Error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating report. Please try again later. Error: {e}"
+        )
 
-    # Handle no data found case
-    if not data:
-        raise HTTPException(status_code=404, detail="No data found for the given parameters.")
+    return report
 
-    return data
-
-
-@router.delete("//{id}", response_model=dict)
+@router.delete("/{id}", response_model=dict)
 def delete_garage_endpoint(id: int, db: Session = Depends(get_db)):
     deleted_garage = garage_crud.delete_garage(db=db, garage_id=id)
     if not deleted_garage:

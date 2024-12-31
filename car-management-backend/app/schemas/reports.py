@@ -2,7 +2,6 @@ from pydantic import BaseModel
 
 
 class DailyAvailabilityResponse(BaseModel):
-    garage_id: int
     date: str
     requests: int
     available_capacity: int
