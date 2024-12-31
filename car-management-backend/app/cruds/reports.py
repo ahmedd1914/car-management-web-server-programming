@@ -1,7 +1,7 @@
 from typing import List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.models.garage import Garage
 from app.models.maintenance import MaintenanceRequest
@@ -9,12 +9,18 @@ from app.schemas.reports import DailyAvailabilityResponse
 
 
 def get_monthly_requests_report(
-    db: Session,
-    garage_id: int,
-    start_date: datetime.date,
-    end_date: datetime.date,
+        db: Session,
+        garage_id: int,
+        start_date: datetime.date,
+        end_date: datetime.date,
 ):
     """Generate the monthly report for a given garage within a date range"""
+
+    # Adjust end_date to include the entire last day of the month
+    end_date = datetime(end_date.year, end_date.month, 1).date()
+    next_month = (end_date.month % 12) + 1
+    next_year = end_date.year + (end_date.month // 12)
+    end_date = datetime(next_year, next_month, 1).date() - timedelta(days=1)
 
     # Query maintenance requests within the date range
     maintenances = db.query(MaintenanceRequest).filter(
@@ -43,7 +49,6 @@ def get_monthly_requests_report(
     ]
 
     return formatted_report
-
 
 
 def get_daily_availability_report(

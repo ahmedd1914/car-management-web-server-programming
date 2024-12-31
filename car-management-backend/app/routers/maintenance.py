@@ -40,7 +40,7 @@ def get_db():
     finally:
         db.close()
 
-@router.post("/maintenance", response_model=MaintenanceRequestResponse)
+@router.post("/", response_model=MaintenanceRequestResponse)
 def create_maintenance_request(
     request: MaintenanceRequestCreate,
     db: Session = Depends(get_db)
@@ -62,7 +62,7 @@ def create_maintenance_request(
 
     return sqlalchemy_to_dict(db_maintenance_request)
 
-@router.get("/maintenance", response_model=list[MaintenanceRequestResponse])
+@router.get("/", response_model=list[MaintenanceRequestResponse])
 def list_maintenance_requests(carId: int = None, garageId: int = None, startDate: str = None, endDate: str = None,
                               db: Session = Depends(get_db)):
     requests = maintenance_crud.get_maintenance_requests(db=db, car_id=carId, garage_id=garageId, start_date=startDate,
@@ -71,7 +71,7 @@ def list_maintenance_requests(carId: int = None, garageId: int = None, startDate
     return [sqlalchemy_to_dict(request) for request in requests]
 
 
-@router.get("/maintenance/{id:int}", response_model=MaintenanceRequestResponse)
+@router.get("/{id:int}", response_model=MaintenanceRequestResponse)
 def get_maintenance_request(id: int, db: Session = Depends(get_db)):
 
     db_request = maintenance_crud.get_maintenance_request(db=db, request_id=id)
@@ -79,7 +79,7 @@ def get_maintenance_request(id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Maintenance request not found.")
     return sqlalchemy_to_dict(db_request)
 
-@router.put("/maintenance/{id}", response_model=MaintenanceRequestResponse)
+@router.put("/{id}", response_model=MaintenanceRequestResponse)
 def update_maintenance_request(
     id: int,
     request: MaintenanceRequestUpdate,
@@ -109,7 +109,7 @@ def update_maintenance_request(
 
     return sqlalchemy_to_dict(updated_request)
 
-@router.delete("/maintenance/{id}", response_model=dict)
+@router.delete("/{id}", response_model=dict)
 def delete_maintenance_request(id: int, db: Session = Depends(get_db)):
 
     deleted_request = maintenance_crud.delete_maintenance_request(db=db, request_id=id)
@@ -120,9 +120,9 @@ def delete_maintenance_request(id: int, db: Session = Depends(get_db)):
 
 @router.get("/monthlyRequestsReport")
 def monthly_requests_report(
-    garage_id: int,
     startMonth: str,
     endMonth: str,
+    garage_id: int = Query(alias="garageId"),
     db: Session = Depends(get_db),
 ):
 
