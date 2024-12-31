@@ -39,13 +39,13 @@ def map_car_to_response(car: Car) -> CarResponse:
     )
 
 
-@router.post("/cars", response_model=CarResponse)
+@router.post("/", response_model=CarResponse)
 def create_car_endpoint(car: CarCreate, db: Session = Depends(get_db)):
     db_car = create_car(db=db, car=car)  # Call the create_car function from your CRUD module
     return map_car_to_response(db_car)
 
 
-@router.get("/cars", response_model=List[CarResponse])
+@router.get("/", response_model=List[CarResponse])
 def list_cars_endpoint(
     carMake: Optional[str] = None,
     garageId: Optional[int] = None,
@@ -57,7 +57,7 @@ def list_cars_endpoint(
     return [map_car_to_response(car) for car in cars]
 
 
-@router.get("/cars/{id}", response_model=CarResponse)
+@router.get("/{id}", response_model=CarResponse)
 def get_car_endpoint(id: int, db: Session = Depends(get_db)):
     car = get_car(db=db, car_id=id)
     if not car:
@@ -65,7 +65,7 @@ def get_car_endpoint(id: int, db: Session = Depends(get_db)):
     return map_car_to_response(car)
 
 
-@router.put("/cars/{id}", response_model=CarResponse)
+@router.put("/{id}", response_model=CarResponse)
 def update_car_endpoint(id: int, car: CarUpdate, db: Session = Depends(get_db)):
     updated_car = update_car(db=db, car_id=id, car=car)
     if not updated_car:
@@ -73,7 +73,7 @@ def update_car_endpoint(id: int, car: CarUpdate, db: Session = Depends(get_db)):
     return map_car_to_response(updated_car)
 
 
-@router.delete("/cars/{id}", response_model=dict)
+@router.delete("/{id}", response_model=dict)
 def delete_car_endpoint(id: int, db: Session = Depends(get_db)):
     deleted_car = delete_car(db=db, car_id=id)
     if not deleted_car:
