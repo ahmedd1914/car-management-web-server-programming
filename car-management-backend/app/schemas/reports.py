@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 
 class DailyAvailabilityResponse(BaseModel):
+    garage_id: int
     date: str
     requests: int
     available_capacity: int
@@ -11,13 +12,10 @@ class DailyAvailabilityResponse(BaseModel):
 
 
 
-class YearMonth(BaseModel):
-    year: int
-    month: str
-    leapYear: bool
-    monthValue: int
-
-class MonthlyReportResponse(BaseModel):
-    year: int
-    month: int
-    requests: int
+# class YearMonth(BaseModel):
+#     year: int
+#     monthValue: int
+#
+# class MonthlyReportResponse(BaseModel):
+#     year_month: str
+#     requests: int

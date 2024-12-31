@@ -1,6 +1,6 @@
 from datetime import date
 from fastapi import HTTPException
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from app.models.maintenance import MaintenanceRequest
 from app.models.car import Car
 from app.models.garage import Garage
@@ -9,23 +9,7 @@ from app.cruds.utils import get_or_404
 
 
 def create_maintenance_request(db: Session, maintenance_request: MaintenanceRequestCreate):
-    """
-    Create a new maintenance request and associate it with an existing Car and Garage.
 
-    Validations:
-    - Scheduled date must not be in the past.
-    - Car and Garage IDs must exist in the database.
-
-    Args:
-        db (Session): Database session.
-        maintenance_request (MaintenanceRequestCreate): The data for the new request.
-
-    Raises:
-        HTTPException: If the scheduled date is in the past or if the Car/Garage does not exist.
-
-    Returns:
-        MaintenanceRequest: The newly created maintenance request with relationships loaded.
-    """
     # Validate the scheduled date
     if maintenance_request.scheduled_date < date.today():
         raise HTTPException(status_code=400, detail="Scheduled date cannot be in the past.")
@@ -36,6 +20,14 @@ def create_maintenance_request(db: Session, maintenance_request: MaintenanceRequ
     # Ensure the Garage exists
     garage = get_or_404(db, Garage, maintenance_request.garage_id, f"Garage with ID {maintenance_request.garage_id} not found.")
 
+    # Check if the garage is full on the scheduled date
+    if is_garage_full(db, maintenance_request.garage_id, maintenance_request.scheduled_date):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Garage with ID {maintenance_request.garage_id} is at full capacity on {maintenance_request.scheduled_date}.",
+        )
+
+    # Create the maintenance request
     db_request = MaintenanceRequest(
         car_id=maintenance_request.car_id,
         car_name=f"{car.make} {car.model}",
@@ -51,17 +43,8 @@ def create_maintenance_request(db: Session, maintenance_request: MaintenanceRequ
     return db_request
 
 
+
 def get_maintenance_request(db: Session, request_id: int):
-    """
-    Retrieve a maintenance request by its ID.
-
-    Args:
-        db (Session): Database session.
-        request_id (int): ID of the maintenance request.
-
-    Returns:
-        MaintenanceRequest: The requested maintenance request or None if not found.
-    """
     return db.query(MaintenanceRequest).filter(MaintenanceRequest.id == request_id).first()
 
 
@@ -72,10 +55,7 @@ def get_maintenance_requests(
     start_date: date = None,
     end_date: date = None
 ):
-    query = db.query(MaintenanceRequest).options(
-        joinedload(MaintenanceRequest.car),
-        joinedload(MaintenanceRequest.garage)
-    )
+    query = db.query(MaintenanceRequest)
 
     # Apply filters
     if car_id:
@@ -133,16 +113,6 @@ def update_maintenance_request(db: Session, request_id: int, maintenance_request
 
 
 def delete_maintenance_request(db: Session, request_id: int):
-    """
-    Delete a maintenance request.
-
-    Args:
-        db (Session): Database session.
-        request_id (int): ID of the maintenance request to delete.
-
-    Returns:
-        MaintenanceRequest: The deleted maintenance request or None if not found.
-    """
     db_request = db.query(MaintenanceRequest).filter(MaintenanceRequest.id == request_id).first()
     if db_request:
         db.delete(db_request)
@@ -152,17 +122,7 @@ def delete_maintenance_request(db: Session, request_id: int):
 
 
 def is_garage_full(db: Session, garage_id: int, scheduled_date: date) -> bool:
-    """
-    Check if a garage is at capacity for a specific date.
 
-    Args:
-        db (Session): Database session.
-        garage_id (int): ID of the garage.
-        scheduled_date (date): Date to check for capacity.
-
-    Returns:
-        bool: True if the garage is full on the given date, False otherwise.
-    """
     # Retrieve the garage to check its capacity
     garage = get_or_404(db, Garage, garage_id, f"Garage with ID {garage_id} not found.")
 

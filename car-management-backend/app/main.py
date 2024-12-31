@@ -1,4 +1,3 @@
-import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,16 +15,16 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],  # Allow requests from the frontend
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
+    allow_methods=["*"],  # Allow all HTTP methods
     allow_headers=["*"],  # Allow all headers
 )
 
 # Include Routers
-app.include_router(cars.router)
-app.include_router(garages.router)
-app.include_router(maintenance.router)
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+app.include_router(cars.router, prefix="/cars", tags=["Cars"])
+app.include_router(garages.router, prefix="/garages", tags=["Garages"])
+app.include_router(maintenance.router, prefix="/maintenance", tags=["Maintenance"])
+
+# Root endpoint
 @app.get("/")
 def root():
     return {"message": "Welcome to the Car Management API!"}
